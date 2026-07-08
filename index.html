@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Cat Clicker</title>
+
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <style>
+      /* ─── Custom keyframe animations (filled in task 2.2) ─── */
+
+      /* Bounce animation for cat */
+      @keyframes cat-bounce {
+        0%, 100% { transform: translateY(0) scaleY(1); }
+        40%       { transform: translateY(-24px) scaleY(1.05); }
+        70%       { transform: translateY(-10px) scaleY(0.97); }
+      }
+
+      /* Spin animation for cat */
+      @keyframes cat-spin {
+        from { transform: rotate(0deg); }
+        to   { transform: rotate(360deg); }
+      }
+
+      /* Squish animation for cat */
+      @keyframes cat-squish {
+        0%, 100% { transform: scaleX(1) scaleY(1); }
+        30%      { transform: scaleX(1.3) scaleY(0.7); }
+        60%      { transform: scaleX(0.85) scaleY(1.15); }
+      }
+
+      /* Celebratory counter pulse */
+      @keyframes counter-celebrate {
+        0%, 100% { transform: scale(1);    color: inherit; }
+        25%      { transform: scale(1.25); color: #f59e0b; }
+        50%      { transform: scale(1.15); color: #ec4899; }
+        75%      { transform: scale(1.2);  color: #8b5cf6; }
+      }
+
+      /* Floating hearts effect */
+      @keyframes float-up {
+        0%   { opacity: 1;  transform: translateY(0) scale(1); }
+        100% { opacity: 0;  transform: translateY(-80px) scale(1.4); }
+      }
+
+      /* Star burst effect */
+      @keyframes star-burst {
+        0%   { opacity: 1;  transform: scale(0.5); }
+        60%  { opacity: 1;  transform: scale(1.3); }
+        100% { opacity: 0;  transform: scale(1.6); }
+      }
+
+      /* Idle yawn animation — subtle stretch/squash when cat is idle */
+      @keyframes idleYawn {
+        0%, 100% { transform: scaleX(1)    scaleY(1);    }
+        20%      { transform: scaleX(0.93) scaleY(1.08); }
+        40%      { transform: scaleX(1.06) scaleY(0.94); }
+        60%      { transform: scaleX(0.97) scaleY(1.04); }
+        80%      { transform: scaleX(1.02) scaleY(0.98); }
+      }
+
+      /* Speech bubble fade-in */
+      @keyframes bubble-pop {
+        0%   { opacity: 0; transform: translateY(6px) scale(0.92); }
+        100% { opacity: 1; transform: translateY(0)  scale(1); }
+      }
+
+      /* ─── Animation utility classes (applied by JS) ─── */
+      .cat--bouncing {
+        animation: cat-bounce 0.5s ease-in-out;
+      }
+      .cat--spinning {
+        animation: cat-spin 0.6s linear;
+      }
+      .cat--squishing {
+        animation: cat-squish 0.4s ease-in-out;
+      }
+      .counter--celebrating {
+        animation: counter-celebrate 0.8s ease-in-out;
+      }
+      .effect--float {
+        animation: float-up 0.8s ease-out forwards;
+        pointer-events: none;
+        position: absolute;
+      }
+      .effect--star {
+        animation: star-burst 0.6s ease-out forwards;
+        pointer-events: none;
+        position: absolute;
+      }
+      .cat--idle-yawn {
+        animation: idleYawn 1.2s ease-in-out;
+      }
+      #speech-bubble {
+        animation: bubble-pop 0.15s ease-out;
+      }
+    </style>
+  </head>
+
+  <body class="bg-amber-50 overflow-x-hidden">
+
+    <!--
+      #app-container
+      Full-viewport flex container — centers cat-wrapper both axes.
+      Responsive: single-column below 640px; max-w-5xl (≤1280px) block at 640px+.
+    -->
+    <div
+      id="app-container"
+      class="
+        relative
+        flex flex-col items-center justify-center
+        min-h-screen w-full
+        px-4
+        overflow-x-hidden
+      "
+    >
+
+      <!--
+        Inner content wrapper — enforces max-width + centered block layout
+        for viewport ≥ 640px (sm breakpoint), full-width column below.
+      -->
+      <div class="w-full sm:max-w-5xl mx-auto flex flex-col items-center gap-6">
+
+        <!-- Page heading -->
+        <h1 class="text-3xl sm:text-4xl font-bold text-amber-800 tracking-tight select-none">
+          Cat Clicker
+        </h1>
+
+        <!--
+          #speech-bubble
+          Positioned above #cat-wrapper; hidden by default.
+          JS removes/adds the 'hidden' class to show/hide.
+        -->
+        <div
+          id="speech-bubble"
+          role="status"
+          aria-live="polite"
+          class="
+            hidden
+            relative
+            bg-white border-2 border-amber-400
+            rounded-2xl px-4 py-2
+            text-amber-900 font-semibold text-base sm:text-lg
+            shadow-md
+            after:content-[''] after:absolute after:left-1/2 after:-translate-x-1/2
+            after:top-full after:border-8 after:border-transparent
+            after:border-t-amber-400
+          "
+        ></div>
+
+        <!--
+          #cat-wrapper
+          Centers the cat SVG; acts as the positioning parent for the focus ring.
+        -->
+        <div id="cat-wrapper" class="relative flex items-center justify-center">
+
+          <!--
+            #cat — interactive SVG cat element.
+            tabindex="0"  → keyboard focusable (Requirement 8.1)
+            aria-label    → describes the interactive element (Requirement 8.3)
+            role="img"    → semantic role for screen readers
+            focus:outline → visible focus ring (Requirement 8.5)
+
+            Placeholder geometry (refined in task 2.1):
+              - outer circle  → head
+              - two triangles → ears
+              - two circles   → eyes
+              - arc path      → smile
+          -->
+          <svg
+            id="cat"
+            tabindex="0"
+            role="img"
+            aria-label="Cat — click or press Space/Enter to pet"
+            viewBox="0 0 200 200"
+            xmlns="http://www.w3.org/2000/svg"
+            class="
+              min-w-[120px]
+              w-40 h-40
+              sm:w-52 sm:h-52
+              md:w-64 md:h-64
+              lg:w-72 lg:h-72
+              cursor-pointer select-none
+              rounded-full
+              transition-transform
+              focus:outline-none focus:ring-4 focus:ring-amber-400 focus:ring-offset-2
+            "
+          >
+            <!-- Head (outer circle) -->
+            <circle cx="100" cy="110" r="75" fill="#FBBF24" stroke="#92400E" stroke-width="4" />
+
+            <!-- Left ear (triangle) -->
+            <polygon points="40,65 60,15 80,65" fill="#FBBF24" stroke="#92400E" stroke-width="4" stroke-linejoin="round" />
+            <!-- Left inner ear -->
+            <polygon points="48,60 60,25 72,60" fill="#FCA5A5" />
+
+            <!-- Right ear (triangle) -->
+            <polygon points="120,65 140,15 160,65" fill="#FBBF24" stroke="#92400E" stroke-width="4" stroke-linejoin="round" />
+            <!-- Right inner ear -->
+            <polygon points="128,60 140,25 152,60" fill="#FCA5A5" />
+
+            <!-- Left eye -->
+            <ellipse cx="78" cy="105" rx="9" ry="10" fill="#1C1917" />
+            <circle cx="81" cy="102" r="3" fill="#FFFFFF" />
+
+            <!-- Right eye -->
+            <ellipse cx="122" cy="105" rx="9" ry="10" fill="#1C1917" />
+            <circle cx="125" cy="102" r="3" fill="#FFFFFF" />
+
+            <!-- Nose -->
+            <polygon points="100,122 95,130 105,130" fill="#FCA5A5" />
+
+            <!-- Smile (arc) -->
+            <path d="M 88 135 Q 100 148 112 135" fill="none" stroke="#92400E" stroke-width="3" stroke-linecap="round" />
+
+            <!-- Left whiskers -->
+            <line x1="25" y1="128" x2="88" y2="128" stroke="#92400E" stroke-width="2" stroke-linecap="round" />
+            <line x1="25" y1="138" x2="88" y2="135" stroke="#92400E" stroke-width="2" stroke-linecap="round" />
+
+            <!-- Right whiskers -->
+            <line x1="112" y1="128" x2="175" y2="128" stroke="#92400E" stroke-width="2" stroke-linecap="round" />
+            <line x1="112" y1="135" x2="175" y2="138" stroke="#92400E" stroke-width="2" stroke-linecap="round" />
+          </svg>
+
+        </div><!-- /#cat-wrapper -->
+
+        <!--
+          #pet-counter
+          Displays "Times petted: {count}" at all times (Requirement 5.1, 5.3, 5.4).
+          Initialized to 0 on page load.
+        -->
+        <p
+          id="pet-counter"
+          aria-live="polite"
+          aria-atomic="true"
+          class="
+            text-xl sm:text-2xl font-semibold
+            text-amber-900
+            tracking-wide
+            select-none
+          "
+        >
+          Times petted: 0
+        </p>
+
+      </div><!-- /.inner content wrapper -->
+
+    </div><!-- /#app-container -->
+
+    <script>
+      (function () {
+        "use strict";
+
+        // ─── App State ────────────────────────────────────────────────────────
+        const state = {
+          petCount: 0,
+          lastReactionId: null,
+          isIdle: false,
+          idleEntryTimer: null,
+          idleBehaviorTimer: null,
+          activeSpeechBubbleTimer: null,
+          activeAnimation: null,
+        };
+
+        // ─── DOM References ───────────────────────────────────────────────────
+        const catEl          = document.getElementById("cat");
+        const speechBubbleEl = document.getElementById("speech-bubble");
+        const petCounterEl   = document.getElementById("pet-counter");
+        const appContainerEl = document.getElementById("app-container");
+
+        // ─── Phrase Pool ──────────────────────────────────────────────────────
+        const phrases = [
+          "Purrrr…",
+          "I love you!",
+          "Boop!",
+          "More pets please!",
+          "Meow~",
+          "You are warm.",
+          "Headbutt!",
+          "So fluffy!",
+          "Mrrrow!",
+          "Nyaa~",
+          "Feed me hooman.",
+          "Knead knead knead.",
+        ];
+
+        // ─── Reaction Pool ────────────────────────────────────────────────────
+        const reactionPool = [
+          { id: "bounce",      type: "animation", animation: "cat--bouncing", phrase: null,        effect: null,           durationMs: 500  },
+          { id: "spin",        type: "animation", animation: "cat--spinning", phrase: null,        effect: null,           durationMs: 600  },
+          { id: "squish",      type: "animation", animation: "cat--squishing",phrase: null,        effect: null,           durationMs: 400  },
+          { id: "purr",        type: "speech",    animation: null,            phrase: "Purrrr…",   effect: null,           durationMs: 1500 },
+          { id: "happy",       type: "speech",    animation: null,            phrase: "I love you!",effect: null,          durationMs: 1500 },
+          { id: "boop",        type: "speech",    animation: null,            phrase: "Boop!",     effect: null,           durationMs: 1500 },
+          { id: "hearts",      type: "effect",    animation: null,            phrase: null,        effect: "floatingHearts",durationMs: 800  },
+          { id: "stars",       type: "effect",    animation: null,            phrase: null,        effect: "starBurst",    durationMs: 600  },
+          { id: "bounce-purr", type: "combo",     animation: "cat--bouncing", phrase: "Purrfect!", effect: null,           durationMs: 1500 },
+          { id: "spin-hearts", type: "combo",     animation: "cat--spinning", phrase: null,        effect: "floatingHearts",durationMs: 800 },
+        ];
+
+        // ─── Pure Logic Functions ─────────────────────────────────────────────
+
+        /**
+         * Increments state.petCount by 1 and returns the new value.
+         * Pure function — no DOM side effects.
+         * @param {Object} state - the AppState object (must have petCount: number)
+         * @returns {number} the new petCount value
+         */
+        function incrementCounter(state) {
+          state.petCount += 1;
+          return state.petCount;
+        }
+
+        // ─── Placeholder stubs (implemented in later tasks) ──────────────────
+        // These will be fleshed out in tasks 3.x, 4.x, 5.x, 6.x
+
+        function selectReaction(pool, lastId) {
+          if (pool.length <= 1) {
+            return pool[Math.floor(Math.random() * pool.length)];
+          }
+          const eligible = pool.filter(r => r.id !== lastId);
+          return eligible[Math.floor(Math.random() * eligible.length)];
+        }
+
+        function selectPhrase(phraseList) {
+          return phraseList[Math.floor(Math.random() * phraseList.length)];
+        }
+
+        function shouldCelebrate(count) {
+          return count !== 0 && count % 10 === 0;
+        }
+
+        const counter = {
+          increment() { return incrementCounter(state); },
+          getCurrent() { return state.petCount; },
+          celebrate()  { /* task 5.1 */ },
+        };
+
+        const speechBubble = {
+          show(phrase) { /* task 4.1 */ },
+          hide()       { /* task 4.1 */ },
+        };
+
+        const animationEngine = {
+          play(animClass, durationMs, onComplete) { /* task 3.1 */ },
+          stop() { /* task 3.1 */ },
+        };
+
+        const idleController = {
+          reset()        { /* task 6.1 */ },
+          enterIdle()    { /* task 6.1 */ },
+          stopBehavior() { /* task 6.1 */ },
+        };
+
+        function registerPet() {
+          // TODO: implement in task 2.x / wire-up task
+        }
+
+        // ─── Event Handlers ───────────────────────────────────────────────────
+        catEl.addEventListener("click", registerPet);
+
+        catEl.addEventListener("keydown", function (e) {
+          if (e.key === " " || e.key === "Enter") {
+            e.preventDefault();
+            registerPet();
+          }
+        });
+
+        catEl.addEventListener("touchstart", function (e) {
+          e.preventDefault(); // prevent synthetic click double-fire
+          registerPet();
+        }, { passive: false });
+
+      })();
+    </script>
+
+  </body>
+</html>
